@@ -86,6 +86,9 @@ export default function VestidosPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right">
+                    <Link href={`/admin/vestidos/${v.id}/ficha`} className="mr-3 text-gold hover:underline">
+                      Ficha
+                    </Link>
                     <Link href={`/admin/vestidos/${v.id}`} className="mr-3 text-gold hover:underline">
                       Editar
                     </Link>

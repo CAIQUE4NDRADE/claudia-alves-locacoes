@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { listReservas, listVestidos, updateStatusReserva } from "@/lib/api";
-import type { Produto, Reserva } from "@/lib/supabase";
+import { listReservas, listVestidos, listClientes, updateStatusReserva } from "@/lib/api";
+import type { Cliente, Produto, Reserva } from "@/lib/supabase";
+import { gerarContrato } from "@/lib/gerarContrato";
 import { toast } from "sonner";
 
 function formatarPreco(valor: number) {
@@ -37,14 +38,16 @@ const STATUS_COR: Record<Reserva["status"], string> = {
 export default function ReservasPage() {
   const [reservas, setReservas] = useState<Reserva[]>([]);
   const [vestidos, setVestidos] = useState<Produto[]>([]);
+  const [clientes, setClientes] = useState<Cliente[]>([]);
   const [carregando, setCarregando] = useState(true);
 
   function carregar() {
     setCarregando(true);
-    Promise.all([listReservas(), listVestidos()])
-      .then(([r, v]) => {
+    Promise.all([listReservas(), listVestidos(), listClientes()])
+      .then(([r, v, c]) => {
         setReservas(r);
         setVestidos(v);
+        setClientes(c);
       })
       .catch((e) => toast.error(e.message ?? "Erro ao carregar reservas"))
       .finally(() => setCarregando(false));
@@ -52,7 +55,8 @@ export default function ReservasPage() {
 
   useEffect(carregar, []);
 
-  const vestidoNome = (id: string) => vestidos.find((v) => v.id === id)?.nome ?? "Vestido removido";
+  const vestido = (id: string) => vestidos.find((v) => v.id === id);
+  const cliente = (id: string) => clientes.find((c) => c.id === id);
 
   async function avancarStatus(reserva: Reserva) {
     const proximo = PROXIMO_STATUS[reserva.status];
@@ -92,13 +96,18 @@ export default function ReservasPage() {
         <div className="space-y-3">
           {reservas.map((r) => {
             const proximo = PROXIMO_STATUS[r.status];
+            const v = vestido(r.produto_id);
+            const c = cliente(r.cliente_id);
             return (
               <div
                 key={r.id}
                 className="flex flex-wrap items-center justify-between gap-3 rounded-xl2 border border-border/70 bg-background p-4"
               >
                 <div>
-                  <p className="text-sm font-medium text-foreground">{vestidoNome(r.produto_id)}</p>
+                  <p className="text-sm font-medium text-foreground">
+                    {v?.nome ?? "Vestido removido"}
+                    {c?.nome ? ` · ${c.nome}` : ""}
+                  </p>
                   <p className="text-xs text-muted">
                     Tam. {r.tamanho} · Evento {formatarData(r.data_evento)} · Retirada{" "}
                     {formatarData(r.data_retirada)} · Devolução {formatarData(r.data_devolucao)}
@@ -108,10 +117,16 @@ export default function ReservasPage() {
                     {formatarPreco(r.valor_caucao)}
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className={`rounded-full px-3 py-1 text-xs font-semibold ${STATUS_COR[r.status]}`}>
                     {STATUS_LABEL[r.status]}
                   </span>
+                  <button
+                    onClick={() => gerarContrato(r, v, c)}
+                    className="rounded-full border border-border px-3.5 py-1.5 text-xs font-semibold text-foreground/80 hover:border-gold hover:text-gold-dark"
+                  >
+                    Gerar contrato
+                  </button>
                   {proximo && (
                     <button
                       onClick={() => avancarStatus(r)}
