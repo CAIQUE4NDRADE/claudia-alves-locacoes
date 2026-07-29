@@ -11,9 +11,28 @@ import {
 import { ProductCard } from "@/components/ProductCard";
 import { ProductFilters } from "@/components/ProductFilters";
 import { AvailabilityCalendar } from "@/components/AvailabilityCalendar";
-import { produtosDestaque, categorias, depoimentos, faq } from "@/lib/mockData";
+import { produtosDestaque as produtosMock, categorias, depoimentos, faq } from "@/lib/mockData";
+import { listVestidosPublicos } from "@/lib/api";
+import { supabaseConfigurado } from "@/lib/supabase";
+import type { Produto } from "@/lib/supabase";
 
-export default function HomePage() {
+export default async function HomePage() {
+  // Busca os vestidos reais cadastrados no painel admin. Se o Supabase não
+  // estiver configurado (ou o acervo ainda estiver vazio), cai para os
+  // vestidos de exemplo em lib/mockData.ts — só pra demonstração, nunca usados
+  // numa reserva de verdade.
+  let produtos: Produto[] = produtosMock;
+  if (supabaseConfigurado) {
+    try {
+      const reais = await listVestidosPublicos();
+      if (reais.length > 0) produtos = reais;
+    } catch (e) {
+      console.error("Erro ao buscar vestidos do Supabase:", e);
+    }
+  }
+  const maisAlugados = produtos.filter((p) => p.mais_alugado);
+  const destaques = (maisAlugados.length > 0 ? maisAlugados : produtos).slice(0, 8);
+
   const numero = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "5519999999999";
   const linkWhatsApp = `https://wa.me/${numero}?text=${encodeURIComponent(
     "Olá! Gostaria de conhecer os vestidos disponíveis para locação da Claudia Alves Locações."
@@ -161,7 +180,7 @@ export default function HomePage() {
         </div>
         <ProductFilters />
         <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-4">
-          {produtosDestaque.map((p) => (
+          {destaques.map((p) => (
             <ProductCard key={p.id} produto={p} />
           ))}
         </div>

@@ -1,10 +1,13 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { MessageCircle, CalendarDays } from "lucide-react";
-import { produtosDestaque } from "@/lib/mockData";
+import { produtosDestaque as produtosMock } from "@/lib/mockData";
+import { getVestidoPorSlug } from "@/lib/api";
+import { supabaseConfigurado } from "@/lib/supabase";
+import type { Produto } from "@/lib/supabase";
 import { useReservaStore } from "@/lib/cartStore";
 import { toast } from "sonner";
 
@@ -14,12 +17,60 @@ function formatarPreco(valor: number) {
 
 export default function ProdutoPage() {
   const params = useParams<{ slug: string }>();
-  const produto = produtosDestaque.find((p) => p.slug === params.slug) ?? produtosDestaque[0];
-  const [tamanho, setTamanho] = useState(produto.tamanhos[0]);
+  const [produto, setProduto] = useState<Produto | null>(null);
+  const [carregando, setCarregando] = useState(true);
+  const [tamanho, setTamanho] = useState("");
   const [dataEvento, setDataEvento] = useState("");
   const [dataRetirada, setDataRetirada] = useState("");
   const [dataDevolucao, setDataDevolucao] = useState("");
   const adicionar = useReservaStore((s) => s.adicionar);
+
+  useEffect(() => {
+    let cancelado = false;
+    setCarregando(true);
+
+    async function carregar() {
+      // Busca o vestido de verdade no Supabase (é o id dele que precisa ir
+      // pra reserva). Só cai pro mockData se o banco não estiver configurado
+      // ou se não achar esse slug lá — nunca mistura os dois.
+      if (supabaseConfigurado) {
+        try {
+          const real = await getVestidoPorSlug(params.slug);
+          if (!cancelado && real) {
+            setProduto(real);
+            setTamanho(real.tamanhos[0] ?? "");
+            setCarregando(false);
+            return;
+          }
+        } catch (e) {
+          console.error("Erro ao buscar vestido no Supabase:", e);
+        }
+      }
+      if (!cancelado) {
+        const mock = produtosMock.find((p) => p.slug === params.slug) ?? null;
+        setProduto(mock);
+        setTamanho(mock?.tamanhos[0] ?? "");
+        setCarregando(false);
+      }
+    }
+
+    carregar();
+    return () => {
+      cancelado = true;
+    };
+  }, [params.slug]);
+
+  if (carregando) {
+    return <div className="mx-auto max-w-6xl px-4 py-20 text-center text-sm text-muted sm:px-6">Carregando…</div>;
+  }
+
+  if (!produto) {
+    return (
+      <div className="mx-auto max-w-6xl px-4 py-20 text-center sm:px-6">
+        <p className="text-sm text-muted">Não encontramos esse vestido. Ele pode ter sido removido do acervo.</p>
+      </div>
+    );
+  }
 
   const numero = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "5519999999999";
   const linkWhatsApp = `https://wa.me/${numero}?text=${encodeURIComponent(

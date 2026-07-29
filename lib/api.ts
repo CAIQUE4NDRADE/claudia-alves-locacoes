@@ -31,6 +31,29 @@ export async function deleteVestido(id: string) {
   if (error) throw error;
 }
 
+/** Catálogo público (site) — só peças ativas, respeitando a política de leitura pública do RLS. */
+export async function listVestidosPublicos(): Promise<Produto[]> {
+  const { data, error } = await supabase
+    .from("produtos")
+    .select("*")
+    .eq("ativo", true)
+    .order("criado_em", { ascending: false });
+  if (error) throw error;
+  return data as Produto[];
+}
+
+/** Busca um vestido pelo slug (página pública de detalhe do produto). */
+export async function getVestidoPorSlug(slug: string): Promise<Produto | null> {
+  const { data, error } = await supabase
+    .from("produtos")
+    .select("*")
+    .eq("slug", slug)
+    .eq("ativo", true)
+    .maybeSingle();
+  if (error) throw error;
+  return data as Produto | null;
+}
+
 // ---------- Clientes ----------
 
 export async function listClientes(): Promise<Cliente[]> {
