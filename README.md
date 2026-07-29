@@ -91,38 +91,54 @@ ativa por período. Por isso:
 
 ## ✅ O que já está pronto
 
-- Home completa com linguagem de locação (hero, selos de confiança
-  específicos — prova, reserva por data, caução devolvida —, categorias em
-  bento grid, mais alugados, como funciona a locação, depoimentos, FAQ, CTA
-  final).
+- Home completa com linguagem de locação (hero cinematográfico, barra de
+  estatísticas, selos de confiança, categorias em bento grid, filtros,
+  mais alugados, linha do tempo "como funciona a locação", calendário de
+  disponibilidade, depoimentos, FAQ, VIP/newsletter, CTA final).
 - Listagem de vestidos com filtro por categoria.
 - Página de vestido com seleção de tamanho e datas (evento, retirada,
   devolução).
-- "Minhas reservas" (equivalente ao carrinho) e checkout que monta a
-  mensagem da reserva — com as datas e os valores de locação/caução — e abre
-  o WhatsApp já preenchido.
-- Schema de banco com disponibilidade por data (sem duplo-booking) e função
-  de checagem de conflito.
-- Login do admin via Supabase Auth.
+- "Minhas reservas" e checkout que **grava a reserva de verdade no
+  Supabase** (tabelas `clientes` e `reservas`, status inicial "solicitada")
+  antes de abrir o WhatsApp já preenchido.
+- Schema de banco com disponibilidade por data (sem duplo-booking), CRM de
+  clientes e despesas para financeiro.
+- **Painel administrativo funcional**, protegido por login (Supabase Auth):
+  - `/admin/dashboard` — reservas pendentes, vestidos mais alugados,
+    faturamento confirmado.
+  - `/admin/vestidos` — lista, cadastro e edição completa (preço, caução,
+    tamanhos, cores, fotos, ficha técnica, status).
+  - `/admin/reservas` — muda o status da reserva (Solicitada → Confirmada
+    → Retirada → Devolvida) ou cancela.
+  - `/admin/clientes` — lista e cadastro rápido de clientes.
+  - Todo o painel redireciona para `/admin/login` se ninguém estiver
+    autenticado (exceto em modo demonstração, sem Supabase configurado).
+
+## ⚠️ Limitações conhecidas (para ajustar antes de escalar)
+
+- No checkout, a checagem de "cliente já existe" por telefone depende de
+  `SELECT` na tabela `clientes`, que fica restrito a admins pela política
+  de RLS — então, com a chave pública (anon), o site sempre cria um
+  cliente novo em vez de reaproveitar um existente. Para uma reserva
+  pública realmente verificar duplicidade, o ideal é mover essa checagem
+  para uma Edge Function/rota de servidor usando a chave de serviço.
+- O checkout não chama ainda `checarDisponibilidade()` antes de salvar —
+  ou seja, duas reservas com datas conflitantes para o mesmo vestido podem
+  ser criadas pelo site (o admin consegue ver e cancelar manualmente, mas
+  o ideal é bloquear isso no front antes de liberar o botão "Reservar").
+- O calendário de disponibilidade da home (`AvailabilityCalendar`) ainda é
+  ilustrativo (dados fixos) — falta conectar com as reservas reais do
+  vestido selecionado.
 
 ## 🔜 Próximos incrementos sugeridos
 
-- Chamar `checarDisponibilidade()` (já pronta em `lib/api.ts`, via RPC
-  `produto_disponivel`) no front antes de liberar o botão "Reservar este
-  vestido", mostrando um aviso se a data já estiver ocupada.
-- Telas de CRUD no painel admin usando as funções já prontas em
-  `lib/api.ts`: vestidos (com upload de imagem e a ficha técnica completa),
-  clientes, reservas (mudança de status: Solicitada → Confirmada →
-  Retirada → Devolvida) e despesas.
-- Dashboard com faturamento do período (soma de `valor_locacao` das
-  reservas confirmadas/devolvidas menos `despesas`), calendário de
-  disponibilidade por vestido e vestidos mais alugados.
-- Login obrigatório (Supabase Auth) protegendo todo o painel admin — hoje
-  só a tela de login existe; falta redirecionar quem não estiver
-  autenticado para longe de `/admin/dashboard`.
-- Um aviso visível no admin quando `supabaseConfigurado` (exportado de
-  `lib/supabase.ts`) for `false`, avisando que o app está em modo
-  demonstração — mesmo padrão do aviso amarelo da Milê Atelier.
+- Conectar `checarDisponibilidade()` (RPC `produto_disponivel`, já pronta
+  em `lib/api.ts`) ao botão "Reservar este vestido" e ao calendário da home.
+- Upload de imagem direto no formulário de vestido (hoje é só colar URLs),
+  usando o bucket `produtos` do Storage.
+- Dashboard financeiro somando `despesas` ao faturamento.
+- Um aviso mais visível quando `supabaseConfigurado` for `false`, além do
+  já existente na barra do admin.
 - Ícones reais `icon-192.png`/`icon-512.png` em `/public`.
 
 ## 📈 Estratégias de conversão aplicadas

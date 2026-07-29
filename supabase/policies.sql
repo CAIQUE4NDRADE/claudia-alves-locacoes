@@ -20,11 +20,24 @@ create policy "produtos_admin_escreve"
   using (exists (select 1 from usuarios_admin where id = auth.uid()))
   with check (exists (select 1 from usuarios_admin where id = auth.uid()));
 
--- Dados de cliente são sensíveis (CPF, endereço, contato) — nunca públicos
-create policy "clientes_somente_admin"
-  on clientes for all
-  using (exists (select 1 from usuarios_admin where id = auth.uid()))
-  with check (exists (select 1 from usuarios_admin where id = auth.uid()));
+-- Dados de cliente são sensíveis (CPF, endereço, contato), mas o checkout
+-- público do site precisa poder CRIAR um cliente novo ao fechar uma reserva.
+-- Leitura, edição e remoção continuam restritas à loja.
+create policy "clientes_criacao_publica"
+  on clientes for insert
+  with check (true);
+
+create policy "clientes_admin_le_edita"
+  on clientes for select
+  using (exists (select 1 from usuarios_admin where id = auth.uid()));
+
+create policy "clientes_admin_atualiza"
+  on clientes for update
+  using (exists (select 1 from usuarios_admin where id = auth.uid()));
+
+create policy "clientes_admin_remove"
+  on clientes for delete
+  using (exists (select 1 from usuarios_admin where id = auth.uid()));
 
 -- Qualquer visitante pode solicitar uma reserva (checkout público do site),
 -- mas só como "solicitada" — a confirmação e qualquer mudança de status

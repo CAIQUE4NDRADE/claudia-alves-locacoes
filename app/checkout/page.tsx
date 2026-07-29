@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useReservaStore } from "@/lib/cartStore";
+import { supabase, supabaseConfigurado } from "@/lib/supabase";
 import { toast } from "sonner";
 
 const CAMPO =
@@ -25,13 +26,58 @@ export default function CheckoutPage() {
     e.preventDefault();
     setEnviando(true);
     const form = new FormData(e.currentTarget);
-    const nome = form.get("nome");
-    const telefone = form.get("telefone");
-    const pagamento = form.get("pagamento");
+    const nome = form.get("nome") as string;
+    const telefone = form.get("telefone") as string;
+    const pagamento = form.get("pagamento") as string;
 
-    // Em produção: gravar a reserva no Supabase (tabela `reservas`) com status
-    // "solicitada" antes de abrir o WhatsApp, para bloquear a data no calendário
-    // até a confirmação da Claudia.
+    // Grava a reserva no Supabase (status "solicitada") antes de abrir o
+    // WhatsApp, para o pedido já aparecer no painel da Claudia. Se o
+    // Supabase não estiver configurado (modo demonstração), pulamos essa
+    // parte e seguimos direto para o WhatsApp — nada trava para o visitante.
+    if (supabaseConfigurado) {
+      try {
+        let clienteId: string | null = null;
+        const { data: existente } = await supabase
+          .from("clientes")
+          .select("id")
+          .eq("telefone", telefone)
+          .maybeSingle();
+
+        if (existente) {
+          clienteId = existente.id;
+        } else {
+          const { data: novoCliente, error: erroCliente } = await supabase
+            .from("clientes")
+            .insert({ nome, telefone, whatsapp: telefone })
+            .select("id")
+            .single();
+          if (erroCliente) throw erroCliente;
+          clienteId = novoCliente.id;
+        }
+
+        const linhasReserva = itens.map((i) => ({
+          produto_id: i.produto.id,
+          cliente_id: clienteId,
+          tamanho: i.tamanho,
+          cor: i.cor,
+          data_evento: i.dataEvento,
+          data_retirada: i.dataRetirada,
+          data_devolucao: i.dataDevolucao,
+          valor_locacao: i.produto.preco_promocional ?? i.produto.preco_diaria,
+          sinal: 0,
+          valor_caucao: i.produto.caucao,
+          status: "solicitada" as const,
+        }));
+
+        const { error: erroReserva } = await supabase.from("reservas").insert(linhasReserva);
+        if (erroReserva) throw erroReserva;
+      } catch (err) {
+        // Não bloqueia o fluxo do WhatsApp por causa disso — só avisa,
+        // já que o pedido ainda pode ser fechado manualmente pela loja.
+        console.error("Erro ao salvar reserva no Supabase:", err);
+        toast.error("Não consegui salvar no banco agora, mas o pedido segue pelo WhatsApp.");
+      }
+    }
 
     const linhas = itens
       .map(
